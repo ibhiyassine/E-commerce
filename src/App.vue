@@ -1,5 +1,6 @@
 <script>
 import ProductItem from './components/ProductItem.vue'
+
 export default {
   name: 'App',
   components: {
@@ -26,6 +27,32 @@ export default {
       }
       return copy
     },
+    filteredProducts() {
+      return this.produits.filter(element => 
+        element.nom.toLowerCase().includes(this.search.toLowerCase()) &&
+        !(this.dispo && !element.Disponible) &&
+        !(this.cat !== '' && element.categorie !== this.cat)
+      )
+    },
+    totalPages() {
+      return Math.ceil(this.filteredProducts.length / this.itemsPerPage)
+    },
+    paginatedProducts() {
+      const startIndex = (this.currentPage - 1) * this.itemsPerPage
+      const endIndex = startIndex + this.itemsPerPage
+      return this.filteredProducts.slice(startIndex, endIndex)
+    },
+    displayedPages() {
+      const pages = []
+      const startPage = Math.max(1, this.currentPage - 2)
+      const endPage = Math.min(this.totalPages, startPage + 4)
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i)
+      }
+      
+      return pages
+    }
   },
   data() {
     return {
@@ -35,12 +62,29 @@ export default {
       cat: '',
       filter: 0,
       cart: [],
+      currentPage: 1,
+      itemsPerPage: 6
     }
   },
   methods: {
     addToCart(id) {
-      if(this.database[id - 1].Disponible)
-      this.cart.push(this.database[id - 1]);
+      if (this.database[id - 1].Disponible) {
+        this.cart.push(this.database[id - 1])
+      }
+    }
+  },
+  watch: {
+    search() {
+      this.currentPage = 1
+    },
+    dispo() {
+      this.currentPage = 1
+    },
+    cat() {
+      this.currentPage = 1
+    },
+    filter() {
+      this.currentPage = 1
     }
   },
   mounted() {
@@ -59,7 +103,6 @@ export default {
       <h1>Les Bonnes Pièces</h1>
     </header>
     <main>
-      <!-- Menu de recherche -->
       <section class="filtres">
         <h3>Filtres</h3>
         <div class="form-floating mb-3">
@@ -89,100 +132,66 @@ export default {
             </option>
           </select>
         </div>
-        <div id="trier">
+        <div id="trier" class="mb-3">
           <select v-model="filter" class="form-select">
             <option value="0">Pas de filtres</option>
             <option value="1">Trier par ordre de prix croissant</option>
             <option value="2">Trier par ordre de prix décroissant</option>
           </select>
         </div>
-        <hr />
+        
         <h3>Panier</h3>
-        <ul class="list-group">
-          <li
-            v-for="(element, index) of cart"
-            class="list-group-item d-flex justify-content-between"
-          >
-            <div>
-              {{ element.nom }}
-            </div>
-            <div>{{ element.prix }}$</div>
-          </li>
-        </ul>
-      </section>
-
-      <!-- Fiches produits -->
-      <section class="fiches d-flex flex-wrap gap-3">
-        <div v-for="(element, index) in produits" :key="index">
-          <ProductItem
-            :produit="element"
-            v-if="
-              element.nom.toLowerCase().includes(search.toLowerCase()) &&
-              !(dispo && !element.Disponible) &&
-              !(cat != '' && element.categorie != cat)
-            "
-            :addToCart="addToCart"
-          />
+        <div id="panier">
+          <ul class="list-group">
+            <li
+              v-for="(element, index) of cart"
+              class="list-group-item d-flex justify-content-between"
+            >
+              <div>
+                {{ element.nom }}
+              </div>
+              <div>{{ element.prix }}$</div>
+            </li>
+            <li v-if="cart.length === 0" class="list-group-item text-center text-muted">
+              Panier vide
+            </li>
+          </ul>
         </div>
       </section>
+
+      <div class="product-container">
+        <section class="fiches">
+          <div v-for="(element, index) in paginatedProducts" :key="index">
+            <ProductItem
+              :produit="element"
+              :addToCart="addToCart"
+            />
+          </div>
+        </section>
+        
+        <div class="pagination">
+          <button 
+            @click="currentPage = Math.max(currentPage - 1, 1)"
+            :disabled="currentPage === 1 || totalPages <= 1"
+          >
+            &laquo;
+          </button>
+          <button 
+            v-for="page in displayedPages" 
+            :key="page"
+            @click="currentPage = page"
+            :class="{ active: currentPage === page }"
+          >
+            {{ page }}
+          </button>
+          <button 
+            @click="currentPage = Math.min(currentPage + 1, totalPages)"
+            :disabled="currentPage === totalPages || totalPages <= 1"
+          >
+            &raquo;
+          </button>
+        </div>
+      </div>
     </main>
   </div>
 </template>
-
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat&display=swap');
-
-body {
-  max-width: 1200px;
-  margin: auto;
-  padding: 16px;
-  font-family: 'Montserrat', sans-serif;
-}
-
-header {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 16px;
-  padding: 8px;
-  background-color: #7451eb;
-  text-align: center;
-  color: white;
-}
-header img {
-  height: 60px;
-  margin-left: 1rem;
-}
-header h1 {
-  flex-grow: 1;
-}
-
-main {
-  display: flex;
-  flex-direction: row;
-}
-
-.filtres {
-  border-radius: 4px;
-  box-shadow: 0px 0px 4px gray;
-  margin: 8px;
-  padding: 8px;
-  min-width: 300px;
-  min-height: 400px;
-}
-.filtres h3 {
-  text-align: center;
-}
-
-.fiches {
-  flex: 1;
-  margin: 8px;
-}
-.fiches img {
-  max-width: 200px;
-}
-.fiches p {
-  margin-top: 4px;
-  margin-bottom: 4px;
-}
-</style>
